@@ -6,19 +6,22 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from utils import get_logger
-from config import RESULTS_DIR, EPOCHS, LEARNING_RATE, BATCH_SIZE, ML_KI_CUTOFF_NM
-from .model import CaspaseInhibitorModel
-from .dataset import CaspaseDataset
+from config import RESULTS_DIR, EPOCHS, LEARNING_RATE, BATCH_SIZE
 
 log = get_logger(__name__)
 MODEL_PATH = RESULTS_DIR / "casp9_model.pt"
 
 CI = os.getenv("CI", "false").lower() == "true"
 EFFECTIVE_BATCH = 16 if CI else BATCH_SIZE
+KI_CUTOFF = float(os.getenv("ML_KI_CUTOFF_NM", "100"))
+ZINC_LIMIT = int(os.getenv("ZINC_SCREEN_LIMIT", "0")) or None
 
 
 def train(smiles_list: list[str], ki_values: list[float]):
     log.info(f"Training on {len(smiles_list)} compounds (batch={EFFECTIVE_BATCH})...")
+    from .dataset import CaspaseDataset
+    from .model import CaspaseInhibitorModel
+
     dataset = CaspaseDataset(smiles_list, ki_values)
     loader = DataLoader(dataset, batch_size=EFFECTIVE_BATCH, shuffle=True)
     model = CaspaseInhibitorModel()
@@ -39,17 +42,18 @@ def train(smiles_list: list[str], ki_values: list[float]):
 
     model.save(str(MODEL_PATH))
     log.info(f"Model saved → {MODEL_PATH}")
-
-    # free memory before screening
     del model, optimizer, loader, dataset
     gc.collect()
-    torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
 
 def screen(smiles_list: list[str]) -> list[dict]:
-    limit = int(os.getenv("ZINC_SCREEN_LIMIT", len(smiles_list)))
-    smiles_list = smiles_list[:limit]
-    log.info(f"Screening {len(smiles_list)} compounds (batch={EFFECTIVE_BATCH})...")
+    from .dataset import CaspaseDataset
+    from .model import CaspaseInhibitorModel
+
+    if ZINC_LIMIT:
+        smiles_list = smiles_list[:ZINC_LIMIT]
+
+    log.info(f"Screening {len(smiles_list)} compounds | Ki cutoff={KI_CUTOFF}nM | batch={EFFECTIVE_BATCH}")
 
     model = CaspaseInhibitorModel()
     model.load(str(MODEL_PATH))
@@ -65,7 +69,7 @@ def screen(smiles_list: list[str]) -> list[dict]:
     results = [
         {"smiles": s, "predicted_ki_nm": round(p, 2)}
         for s, p in zip(smiles_list, predictions)
-        if p < ML_KI_CUTOFF_NM
+        if p < KI_CUTOFF
     ]
     results.sort(key=lambda x: x["predicted_ki_nm"])
     out = RESULTS_DIR / "ml_hits.json"

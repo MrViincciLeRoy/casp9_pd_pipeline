@@ -1,4 +1,6 @@
+import gc
 import json
+import os
 import torch
 from pathlib import Path
 from torch.utils.data import DataLoader
@@ -11,17 +13,21 @@ from .dataset import CaspaseDataset
 log = get_logger(__name__)
 MODEL_PATH = RESULTS_DIR / "casp9_model.pt"
 
+CI = os.getenv("CI", "false").lower() == "true"
+EFFECTIVE_BATCH = 16 if CI else BATCH_SIZE
+
+
 def train(smiles_list: list[str], ki_values: list[float]):
-    log.info(f"Training on {len(smiles_list)} compounds...")
+    log.info(f"Training on {len(smiles_list)} compounds (batch={EFFECTIVE_BATCH})...")
     dataset = CaspaseDataset(smiles_list, ki_values)
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+    loader = DataLoader(dataset, batch_size=EFFECTIVE_BATCH, shuffle=True)
     model = CaspaseInhibitorModel()
     optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
     loss_fn = torch.nn.MSELoss()
 
     model.train()
     for epoch in range(EPOCHS):
-        total_loss = 0
+        total_loss = 0.0
         for batch in loader:
             optimizer.zero_grad()
             preds = model(batch["input_ids"], batch["attention_mask"])
@@ -33,14 +39,22 @@ def train(smiles_list: list[str], ki_values: list[float]):
 
     model.save(str(MODEL_PATH))
     log.info(f"Model saved → {MODEL_PATH}")
-    return model
+
+    # free memory before screening
+    del model, optimizer, loader, dataset
+    gc.collect()
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
 
 def screen(smiles_list: list[str]) -> list[dict]:
-    log.info(f"Screening {len(smiles_list)} compounds via ML model...")
+    limit = int(os.getenv("ZINC_SCREEN_LIMIT", len(smiles_list)))
+    smiles_list = smiles_list[:limit]
+    log.info(f"Screening {len(smiles_list)} compounds (batch={EFFECTIVE_BATCH})...")
+
     model = CaspaseInhibitorModel()
     model.load(str(MODEL_PATH))
     dataset = CaspaseDataset(smiles_list, [0.0] * len(smiles_list))
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE)
+    loader = DataLoader(dataset, batch_size=EFFECTIVE_BATCH)
     predictions = []
 
     with torch.no_grad():
@@ -58,6 +72,7 @@ def screen(smiles_list: list[str]) -> list[dict]:
     out.write_text(json.dumps(results, indent=2))
     log.info(f"{len(results)} ML hits → {out}")
     return results
+
 
 def run(inhibitor_data: list[dict], zinc_smiles: list[str]):
     smiles = [d["smiles"] for d in inhibitor_data]

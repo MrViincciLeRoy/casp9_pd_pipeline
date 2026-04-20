@@ -3,11 +3,14 @@ name: Phase 1 — Data Gathering
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * 0"  # weekly refresh
+    - cron: "0 0 * * 0"
 
 jobs:
   gather:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -15,21 +18,24 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-phase1-${{ hashFiles('requirements.txt') }}
+          key: pip-p1-${{ hashFiles('requirements.txt') }}
 
-      - name: Install dependencies
-        run: pip install requests biopython
+      - run: pip install requests biopython
 
-      - name: Run Phase 1
-        run: python run_pipeline.py --phases 1
+      - run: python run_pipeline.py --phases 1
 
-      - name: Upload data artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase1-data
-          path: data/
-          retention-days: 30
+      - name: Bundle phase 1 data
+        run: tar -czf phase1-data.tar.gz data/structures/ data/chembl/ data/zinc/
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete phase1-latest --yes 2>/dev/null || true
+          gh release create phase1-latest \
+            --title "Phase 1 Data" \
+            --notes "Auto-generated phase 1 output" \
+            phase1-data.tar.gz

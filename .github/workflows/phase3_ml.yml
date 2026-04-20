@@ -10,6 +10,8 @@ jobs:
   ml-screen:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -18,33 +20,36 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-phase3-${{ hashFiles('requirements.txt') }}
+          key: pip-p3-${{ hashFiles('requirements.txt') }}
 
-      - name: Cache HuggingFace model
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
           key: hf-chemberta-v1
 
-      - name: Install dependencies
-        run: pip install torch transformers requests
+      - run: pip install torch transformers requests
 
-      - name: Download Phase 1 data
-        uses: actions/download-artifact@v4
-        with:
-          name: phase1-data
-          path: data/
+      - name: Download phase 1 release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download phase1-latest --pattern "phase1-data.tar.gz"
+          tar -xzf phase1-data.tar.gz
 
-      - name: Run Phase 3
-        run: python run_pipeline.py --phases 3
+      - run: python run_pipeline.py --phases 3
 
-      - name: Upload ML hits
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase3-ml-hits
-          path: data/results/ml_hits.json
-          retention-days: 30
+      - name: Bundle ML results
+        run: tar -czf phase3-ml-hits.tar.gz data/results/ml_hits.json data/results/casp9_model.pt
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete phase3-latest --yes 2>/dev/null || true
+          gh release create phase3-latest \
+            --title "Phase 3 ML Hits" \
+            --notes "Auto-generated phase 3 output" \
+            phase3-ml-hits.tar.gz

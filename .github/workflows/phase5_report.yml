@@ -20,26 +20,22 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Download ADMET results
-        uses: actions/download-artifact@v4
-        with:
-          name: phase4-admet-passed
-          path: data/results/
-
-      - name: Run Phase 5
-        run: python run_pipeline.py --phases 5
-
-      - name: Upload report
-        uses: actions/upload-artifact@v4
-        with:
-          name: pipeline-report
-          path: data/results/report_*.md
-          retention-days: 90
-
-      - name: Commit report to repo
+      - name: Download phase 4 release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/results/report_*.md
-          git diff --staged --quiet || git commit -m "chore: pipeline report $(date +'%Y-%m-%d')"
-          git push
+          gh release download phase4-latest --pattern "phase4-admet-passed.tar.gz"
+          tar -xzf phase4-admet-passed.tar.gz
+
+      - run: python run_pipeline.py --phases 5
+
+      - name: Upload report to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPORT=$(ls data/results/report_*.md | head -1)
+          gh release delete pipeline-report --yes 2>/dev/null || true
+          gh release create pipeline-report \
+            --title "Pipeline Report $(date +'%Y-%m-%d')" \
+            --notes "Final Caspase-9 inhibitor candidates" \
+            "$REPORT"

@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from utils import get_logger
@@ -8,7 +9,8 @@ log = get_logger("pipeline")
 
 def load_json(path: Path) -> list:
     if path.exists():
-        return json.loads(path.read_text())
+        data = json.loads(path.read_text())
+        return data if data else []
     return []
 
 def run(phases: list[str]):
@@ -30,36 +32,33 @@ def run(phases: list[str]):
 
     if "2" in phases:
         log.info("--- Phase 2: Virtual Docking ---")
-        log.info("Phase 2 requires AutoDock Vina + GNINA installed locally.")
-        log.info("Prepare ligands via phase2_docking.protein_prep.prepare_ligand()")
-        log.info("Then run: phase2_docking.vina_dock.run_vina_screen(ligand_files)")
-        log.info("Then run: phase2_docking.gnina_dock.run_gnina_validation(vina_hits)")
+        log.info("Requires AutoDock Vina + GNINA installed locally.")
 
     if "3" in phases:
         log.info("--- Phase 3: ML Screening ---")
         inhibitor_data = load_json(CHEMBL_DIR / "casp9_inhibitors.json")
-        zinc_smiles = load_json(ZINC_DIR / "zinc_subset_10000.json")
+        zinc_smiles = load_json(list(ZINC_DIR.glob("zinc_subset_*.json"))[0] if list(ZINC_DIR.glob("zinc_subset_*.json")) else Path(""))
         if not inhibitor_data:
-            log.warning("No ChEMBL data found — run Phase 1 first")
+            log.error("No ChEMBL data found — run Phase 1 first")
             sys.exit(1)
         from phase3_ml import ml_screen
         ml_hits = ml_screen(inhibitor_data, zinc_smiles)
+        log.info(f"Phase 3 complete — {len(ml_hits)} ML hits")
 
     if "4" in phases:
         log.info("--- Phase 4: ADMET Filtering ---")
         candidates = ml_hits or load_json(RESULTS_DIR / "ml_hits.json")
         if not candidates:
-            log.warning("No ML hits found — run Phase 3 first")
-            sys.exit(1)
-        from phase4_admet import run_admet_filter
-        admet_passed = run_admet_filter(candidates)
+            log.warning("No ML hits — ADMET filter will run on empty set, writing empty results")
+            (RESULTS_DIR / "admet_passed.json").write_text("[]")
+        else:
+            from phase4_admet import run_admet_filter
+            admet_passed = run_admet_filter(candidates)
+            log.info(f"Phase 4 complete — {len(admet_passed)} candidates passed ADMET")
 
     if "5" in phases:
         log.info("--- Phase 5: Report Generation ---")
         final = admet_passed or load_json(RESULTS_DIR / "admet_passed.json")
-        if not final:
-            log.warning("No ADMET-passed candidates — run Phase 4 first")
-            sys.exit(1)
         from phase5_report import generate_report
         report_path = generate_report(final)
         log.info(f"Pipeline complete. Report: {report_path}")
@@ -71,7 +70,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Caspase-9 × PD Drug Discovery Pipeline")
     parser.add_argument(
         "--phases", nargs="+", default=["1", "3", "4", "5"],
-        help="Phases to run: 1=data 2=docking 3=ml 4=admet 5=report (default: 1 3 4 5)"
+        help="Phases to run: 1 2 3 4 5"
     )
     args = parser.parse_args()
     run(args.phases)

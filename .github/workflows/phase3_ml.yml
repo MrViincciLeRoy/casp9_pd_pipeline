@@ -15,7 +15,8 @@ jobs:
     timeout-minutes: 45
     env:
       CI: "true"
-      ZINC_SCREEN_LIMIT: "1000"  # screen 1K in CI — run locally for full 10K+
+      ZINC_SCREEN_LIMIT: "1000"
+      ML_KI_CUTOFF_NM: "10000"  # relaxed for CI — tighten locally
 
     steps:
       - uses: actions/checkout@v4
@@ -34,8 +35,7 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-chemberta-v1
 
-      - name: Install dependencies
-        run: pip install --no-cache-dir torch transformers requests
+      - run: pip install --no-cache-dir torch transformers requests
 
       - name: Download phase 1 release asset
         env:
@@ -44,8 +44,7 @@ jobs:
           gh release download phase1-latest --pattern "phase1-data.tar.gz"
           tar -xzf phase1-data.tar.gz
 
-      - name: Run Phase 3 (train only)
-        run: python run_pipeline.py --phases 3
+      - run: python run_pipeline.py --phases 3
 
       - name: Bundle ML results
         run: |

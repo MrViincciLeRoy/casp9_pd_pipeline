@@ -1,0 +1,6 @@
+requests
+biopython
+rdkit
+torch
+transformers
+vina

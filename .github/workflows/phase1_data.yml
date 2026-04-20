@@ -1,0 +1,35 @@
+name: Phase 1 — Data Gathering
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 0"  # weekly refresh
+
+jobs:
+  gather:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-phase1-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install requests biopython
+
+      - name: Run Phase 1
+        run: python run_pipeline.py --phases 1
+
+      - name: Upload data artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-data
+          path: data/
+          retention-days: 30

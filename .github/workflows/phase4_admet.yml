@@ -1,0 +1,44 @@
+name: Phase 4 — ADMET Filtering
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Phase 3 — ML Screening"]
+    types: [completed]
+
+jobs:
+  admet-filter:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-phase4-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install rdkit requests
+
+      - name: Download ML hits
+        uses: actions/download-artifact@v4
+        with:
+          name: phase3-ml-hits
+          path: data/results/
+
+      - name: Run Phase 4
+        run: python run_pipeline.py --phases 4
+
+      - name: Upload ADMET results
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase4-admet-passed
+          path: data/results/admet_passed.json
+          retention-days: 30

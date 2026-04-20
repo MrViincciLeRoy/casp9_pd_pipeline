@@ -1,0 +1,114 @@
+name: Full Pipeline (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      zinc_limit:
+        description: "Number of ZINC compounds to screen"
+        required: false
+        default: "10000"
+      ki_cutoff:
+        description: "ML Ki cutoff in nM (lower = stricter)"
+        required: false
+        default: "100"
+
+jobs:
+  phase1:
+    name: "Phase 1 — Data Gathering"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+      - run: pip install requests biopython
+      - run: python run_pipeline.py --phases 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data-phase1
+          path: data/
+
+  phase3:
+    name: "Phase 3 — ML Screening"
+    needs: phase1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-chemberta-v1
+      - run: pip install torch transformers requests
+      - uses: actions/download-artifact@v4
+        with:
+          name: data-phase1
+          path: data/
+      - run: python run_pipeline.py --phases 3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data-phase3
+          path: data/results/ml_hits.json
+
+  phase4:
+    name: "Phase 4 — ADMET Filtering"
+    needs: phase3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+      - run: pip install rdkit requests
+      - uses: actions/download-artifact@v4
+        with:
+          name: data-phase3
+          path: data/results/
+      - run: python run_pipeline.py --phases 4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data-phase4
+          path: data/results/admet_passed.json
+
+  phase5:
+    name: "Phase 5 — Report"
+    needs: phase4
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: data-phase4
+          path: data/results/
+      - run: python run_pipeline.py --phases 5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-report
+          path: data/results/report_*.md
+          retention-days: 90
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/results/report_*.md
+          git diff --staged --quiet || git commit -m "chore: pipeline report $(date +'%Y-%m-%d')"
+          git push

@@ -2,6 +2,10 @@ name: Phase 5 — Report Generation
 
 on:
   workflow_dispatch:
+    inputs:
+      top_n_candidates:
+        description: "Top N candidates to include in report"
+        default: "20"
   workflow_run:
     workflows: ["Phase 4 — ADMET Filtering"]
     types: [completed]
@@ -12,23 +16,30 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     permissions:
       contents: write
-
+    env:
+      TOP_N_CANDIDATES: ${{ github.event.inputs.top_n_candidates || '20' }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+<<<<<<< HEAD
 
+=======
+>>>>>>> 9639c8b (env vars)
       - name: Download phase 4 release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download phase4-latest --pattern "phase4-admet-passed.tar.gz"
           tar -xzf phase4-admet-passed.tar.gz
+<<<<<<< HEAD
 
       - run: python run_pipeline.py --phases 5
 
+=======
+      - run: python run_pipeline.py --phases 5
+>>>>>>> 9639c8b (env vars)
       - name: Upload report to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -39,3 +50,11 @@ jobs:
             --title "Pipeline Report $(date +'%Y-%m-%d')" \
             --notes "Final Caspase-9 inhibitor candidates" \
             "$REPORT"
+<<<<<<< HEAD
+=======
+      - name: Write report to workflow summary
+        run: |
+          REPORT=$(ls data/results/report_*.md | head -1)
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          cat "$REPORT" >> $GITHUB_STEP_SUMMARY
+>>>>>>> 9639c8b (env vars)

@@ -40,3 +40,8 @@ def fetch_casp9_inhibitors() -> list[dict]:
 
 def run():
     fetch_casp9_inhibitors()
+
+
+# allow env override
+import os as _os
+CHEMBL_LIMIT = int(_os.getenv("CHEMBL_LIMIT", str(CHEMBL_LIMIT)))

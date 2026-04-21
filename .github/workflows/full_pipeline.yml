@@ -70,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 45
+    timeout-minutes: 125
     env:
       CI: "true"
       ZINC_SCREEN_LIMIT: ${{ github.event.inputs.zinc_limit }}

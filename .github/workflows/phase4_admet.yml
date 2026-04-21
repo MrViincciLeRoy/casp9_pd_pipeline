@@ -16,55 +16,24 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     permissions:
       contents: write
-<<<<<<< HEAD
-
-=======
     env:
       DOCKING_SCORE_CUTOFF: ${{ github.event.inputs.docking_score_cutoff || '-7.0' }}
->>>>>>> 9639c8b (env vars)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-<<<<<<< HEAD
-
-=======
->>>>>>> 9639c8b (env vars)
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: pip-p4-${{ hashFiles('requirements.txt') }}
-<<<<<<< HEAD
-
       - run: pip install rdkit requests
-
-=======
-      - run: pip install rdkit requests
->>>>>>> 9639c8b (env vars)
       - name: Download phase 3 release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download phase3-latest --pattern "phase3-ml-hits.tar.gz"
           tar -xzf phase3-ml-hits.tar.gz
-<<<<<<< HEAD
-
-      - run: python run_pipeline.py --phases 4
-
-      - name: Bundle ADMET results
-        run: tar -czf phase4-admet-passed.tar.gz data/results/admet_passed.json
-
-      - name: Upload to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release delete phase4-latest --yes 2>/dev/null || true
-          gh release create phase4-latest \
-            --title "Phase 4 ADMET Results" \
-            --notes "Auto-generated phase 4 output" \
-            phase4-admet-passed.tar.gz
-=======
       - run: python run_pipeline.py --phases 4
       - name: Bundle and release
         env:
@@ -80,4 +49,3 @@ jobs:
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Passed Lipinski + BBB | $PASSED |" >> $GITHUB_STEP_SUMMARY
->>>>>>> 9639c8b (env vars)

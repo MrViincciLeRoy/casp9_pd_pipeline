@@ -5,14 +5,6 @@ on:
     inputs:
       zinc_limit:
         description: "ZINC compounds to screen"
-<<<<<<< HEAD
-        required: false
-        default: "10000"
-      ki_cutoff:
-        description: "ML Ki cutoff in nM"
-        required: false
-        default: "100"
-=======
         default: "1000"
       ki_cutoff:
         description: "ML Ki cutoff (nM) — lower = stricter"
@@ -32,7 +24,6 @@ on:
       top_n_candidates:
         description: "Top N candidates in final report"
         default: "20"
->>>>>>> 9639c8b (env vars)
 
 jobs:
   phase1:
@@ -40,12 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-<<<<<<< HEAD
-=======
     env:
       CHEMBL_LIMIT: ${{ github.event.inputs.chembl_limit }}
       ZINC_SCREEN_LIMIT: ${{ github.event.inputs.zinc_limit }}
->>>>>>> 9639c8b (env vars)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -64,8 +52,6 @@ jobs:
           tar -czf phase1-data.tar.gz data/structures/ data/chembl/ data/zinc/
           gh release delete phase1-latest --yes 2>/dev/null || true
           gh release create phase1-latest --title "Phase 1 Data" --notes "phase 1" phase1-data.tar.gz
-<<<<<<< HEAD
-=======
       - name: Summary
         run: |
           echo "## Phase 1 — Data Gathering ✅" >> $GITHUB_STEP_SUMMARY
@@ -77,7 +63,6 @@ jobs:
           ZINC=$(ls data/zinc/*.json 2>/dev/null | head -1 | xargs -I{} python3 -c "import sys,json; print(len(json.load(open('{}')))" 2>/dev/null || echo "?")
           echo "| Inhibitors fetched | $INHIB |" >> $GITHUB_STEP_SUMMARY
           echo "| ZINC compounds | $ZINC |" >> $GITHUB_STEP_SUMMARY
->>>>>>> 9639c8b (env vars)
 
   phase3:
     name: "Phase 3 — ML Screening"
@@ -85,8 +70,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-<<<<<<< HEAD
-=======
     timeout-minutes: 45
     env:
       CI: "true"
@@ -94,7 +77,6 @@ jobs:
       ML_KI_CUTOFF_NM: ${{ github.event.inputs.ki_cutoff }}
       EPOCHS: ${{ github.event.inputs.epochs }}
       BATCH_SIZE: ${{ github.event.inputs.batch_size }}
->>>>>>> 9639c8b (env vars)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -108,11 +90,7 @@ jobs:
         with:
           path: ~/.cache/huggingface
           key: hf-chemberta-v1
-<<<<<<< HEAD
-      - run: pip install torch transformers requests
-=======
       - run: pip install --no-cache-dir torch transformers requests
->>>>>>> 9639c8b (env vars)
       - name: Download phase 1 asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -127,8 +105,6 @@ jobs:
           tar -czf phase3-ml-hits.tar.gz data/results/ml_hits.json data/results/casp9_model.pt
           gh release delete phase3-latest --yes 2>/dev/null || true
           gh release create phase3-latest --title "Phase 3 ML Hits" --notes "phase 3" phase3-ml-hits.tar.gz
-<<<<<<< HEAD
-=======
       - name: Summary
         run: |
           echo "## Phase 3 — ML Screening ✅" >> $GITHUB_STEP_SUMMARY
@@ -140,7 +116,6 @@ jobs:
           echo "| ZINC screened | ${{ github.event.inputs.zinc_limit }} |" >> $GITHUB_STEP_SUMMARY
           HITS=$(cat data/results/ml_hits.json 2>/dev/null | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
           echo "| ML hits | $HITS |" >> $GITHUB_STEP_SUMMARY
->>>>>>> 9639c8b (env vars)
 
   phase4:
     name: "Phase 4 — ADMET Filtering"
@@ -148,11 +123,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-<<<<<<< HEAD
-=======
     env:
       DOCKING_SCORE_CUTOFF: ${{ github.event.inputs.docking_score_cutoff }}
->>>>>>> 9639c8b (env vars)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -177,8 +149,6 @@ jobs:
           tar -czf phase4-admet-passed.tar.gz data/results/admet_passed.json
           gh release delete phase4-latest --yes 2>/dev/null || true
           gh release create phase4-latest --title "Phase 4 ADMET" --notes "phase 4" phase4-admet-passed.tar.gz
-<<<<<<< HEAD
-=======
       - name: Summary
         run: |
           echo "## Phase 4 — ADMET Filtering ✅" >> $GITHUB_STEP_SUMMARY
@@ -186,7 +156,6 @@ jobs:
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Candidates passed ADMET | $PASSED |" >> $GITHUB_STEP_SUMMARY
->>>>>>> 9639c8b (env vars)
 
   phase5:
     name: "Phase 5 — Report"
@@ -218,12 +187,9 @@ jobs:
             --title "Pipeline Report $(date +'%Y-%m-%d')" \
             --notes "Final Caspase-9 inhibitor candidates" \
             "$REPORT"
-<<<<<<< HEAD
-=======
       - name: Write report to workflow summary
         run: |
           REPORT=$(ls data/results/report_*.md | head -1)
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           cat "$REPORT" >> $GITHUB_STEP_SUMMARY
->>>>>>> 9639c8b (env vars)

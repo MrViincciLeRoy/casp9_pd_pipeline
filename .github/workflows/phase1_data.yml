@@ -17,45 +17,18 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-<<<<<<< HEAD
-
-=======
     env:
       CHEMBL_LIMIT: ${{ github.event.inputs.chembl_limit || '1000' }}
       ZINC_SCREEN_LIMIT: ${{ github.event.inputs.zinc_limit || '1000' }}
->>>>>>> 9639c8b (env vars)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-<<<<<<< HEAD
-
-=======
->>>>>>> 9639c8b (env vars)
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: pip-p1-${{ hashFiles('requirements.txt') }}
-<<<<<<< HEAD
-
-      - run: pip install requests biopython
-
-      - run: python run_pipeline.py --phases 1
-
-      - name: Bundle phase 1 data
-        run: tar -czf phase1-data.tar.gz data/structures/ data/chembl/ data/zinc/
-
-      - name: Upload to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release delete phase1-latest --yes 2>/dev/null || true
-          gh release create phase1-latest \
-            --title "Phase 1 Data" \
-            --notes "Auto-generated phase 1 output" \
-            phase1-data.tar.gz
-=======
       - run: pip install requests biopython
       - run: python run_pipeline.py --phases 1
       - name: Bundle and release
@@ -73,4 +46,3 @@ jobs:
           INHIB=$(cat data/chembl/casp9_inhibitors.json 2>/dev/null | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "?")
           echo "| Inhibitors fetched | $INHIB |" >> $GITHUB_STEP_SUMMARY
           echo "| PDB structures | 2AR9, 8A9L |" >> $GITHUB_STEP_SUMMARY
->>>>>>> 9639c8b (env vars)

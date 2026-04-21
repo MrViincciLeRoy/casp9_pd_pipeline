@@ -28,69 +28,30 @@ jobs:
     timeout-minutes: 45
     env:
       CI: "true"
-<<<<<<< HEAD
-      ZINC_SCREEN_LIMIT: "1000"
-      ML_KI_CUTOFF_NM: "10000"  # relaxed for CI — tighten locally
-
-=======
       ZINC_SCREEN_LIMIT: ${{ github.event.inputs.zinc_limit || '1000' }}
       ML_KI_CUTOFF_NM: ${{ github.event.inputs.ki_cutoff || '10000' }}
       EPOCHS: ${{ github.event.inputs.epochs || '10' }}
       BATCH_SIZE: ${{ github.event.inputs.batch_size || '16' }}
->>>>>>> 9639c8b (env vars)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-<<<<<<< HEAD
-
-=======
->>>>>>> 9639c8b (env vars)
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: pip-p3-${{ hashFiles('requirements.txt') }}
-<<<<<<< HEAD
-
-=======
->>>>>>> 9639c8b (env vars)
       - uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
           key: hf-chemberta-v1
-<<<<<<< HEAD
-
       - run: pip install --no-cache-dir torch transformers requests
-
-=======
-      - run: pip install --no-cache-dir torch transformers requests
->>>>>>> 9639c8b (env vars)
       - name: Download phase 1 release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download phase1-latest --pattern "phase1-data.tar.gz"
           tar -xzf phase1-data.tar.gz
-<<<<<<< HEAD
-
-      - run: python run_pipeline.py --phases 3
-
-      - name: Bundle ML results
-        run: |
-          mkdir -p data/results
-          tar -czf phase3-ml-hits.tar.gz data/results/ml_hits.json data/results/casp9_model.pt
-
-      - name: Upload to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release delete phase3-latest --yes 2>/dev/null || true
-          gh release create phase3-latest \
-            --title "Phase 3 ML Hits" \
-            --notes "Auto-generated phase 3 output" \
-            phase3-ml-hits.tar.gz
-=======
       - run: python run_pipeline.py --phases 3
       - name: Bundle and release
         env:
@@ -109,4 +70,3 @@ jobs:
           echo "| Ki cutoff | ${ML_KI_CUTOFF_NM} nM |" >> $GITHUB_STEP_SUMMARY
           HITS=$(cat data/results/ml_hits.json 2>/dev/null | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
           echo "| ML hits | $HITS |" >> $GITHUB_STEP_SUMMARY
->>>>>>> 9639c8b (env vars)

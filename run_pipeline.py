@@ -7,11 +7,20 @@ from utils import get_logger
 
 log = get_logger("pipeline")
 
+
 def load_json(path: Path) -> list:
-    if path.exists():
+    if path and path.exists():
         data = json.loads(path.read_text())
-        return data if data else []
+        return data if isinstance(data, list) else []
     return []
+
+
+def find_zinc_file(zinc_dir: Path) -> Path | None:
+    matches = sorted(zinc_dir.glob("zinc_subset_*.json"))
+    if matches:
+        return matches[-1]
+    return None
+
 
 def run(phases: list[str]):
     from config import RESULTS_DIR, CHEMBL_DIR, ZINC_DIR
@@ -37,10 +46,18 @@ def run(phases: list[str]):
     if "3" in phases:
         log.info("--- Phase 3: ML Screening ---")
         inhibitor_data = load_json(CHEMBL_DIR / "casp9_inhibitors.json")
-        zinc_smiles = load_json(list(ZINC_DIR.glob("zinc_subset_*.json"))[0] if list(ZINC_DIR.glob("zinc_subset_*.json")) else Path(""))
         if not inhibitor_data:
-            log.error("No ChEMBL data found — run Phase 1 first")
+            log.error("No ChEMBL data — run Phase 1 first")
             sys.exit(1)
+
+        zinc_file = find_zinc_file(ZINC_DIR)
+        if not zinc_file:
+            log.error(f"No ZINC file found in {ZINC_DIR} — run Phase 1 first")
+            sys.exit(1)
+
+        zinc_smiles = load_json(zinc_file)
+        log.info(f"Loaded {len(zinc_smiles)} ZINC compounds from {zinc_file.name}")
+
         from phase3_ml import ml_screen
         ml_hits = ml_screen(inhibitor_data, zinc_smiles)
         log.info(f"Phase 3 complete — {len(ml_hits)} ML hits")
@@ -49,7 +66,7 @@ def run(phases: list[str]):
         log.info("--- Phase 4: ADMET Filtering ---")
         candidates = ml_hits or load_json(RESULTS_DIR / "ml_hits.json")
         if not candidates:
-            log.warning("No ML hits — ADMET filter will run on empty set, writing empty results")
+            log.warning("No ML hits — writing empty ADMET results and continuing")
             (RESULTS_DIR / "admet_passed.json").write_text("[]")
         else:
             from phase4_admet import run_admet_filter
@@ -68,9 +85,6 @@ def run(phases: list[str]):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Caspase-9 × PD Drug Discovery Pipeline")
-    parser.add_argument(
-        "--phases", nargs="+", default=["1", "3", "4", "5"],
-        help="Phases to run: 1 2 3 4 5"
-    )
+    parser.add_argument("--phases", nargs="+", default=["1", "3", "4", "5"])
     args = parser.parse_args()
     run(args.phases)

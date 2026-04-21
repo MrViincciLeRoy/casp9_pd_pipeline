@@ -10,11 +10,21 @@ from config import RESULTS_DIR, BATCH_SIZE, LEARNING_RATE
 log = get_logger(__name__)
 MODEL_PATH = RESULTS_DIR / "casp9_model.pt"
 
+
+def _env_int(key: str, default: int) -> int:
+    val = os.getenv(key, "").strip()
+    return int(val) if val else default
+
+def _env_float(key: str, default: float) -> float:
+    val = os.getenv(key, "").strip()
+    return float(val) if val else default
+
+
 CI = os.getenv("CI", "false").lower() == "true"
-KI_CUTOFF = float(os.getenv("ML_KI_CUTOFF_NM", "100"))
-ZINC_LIMIT = int(os.getenv("ZINC_SCREEN_LIMIT", "0")) or None
-EPOCHS = int(os.getenv("EPOCHS", "10"))
-EFFECTIVE_BATCH = int(os.getenv("BATCH_SIZE", str(16 if CI else BATCH_SIZE)))
+KI_CUTOFF       = _env_float("ML_KI_CUTOFF_NM", 100.0)
+ZINC_LIMIT      = _env_int("ZINC_SCREEN_LIMIT", 0) or None
+EPOCHS          = _env_int("EPOCHS", 10)
+EFFECTIVE_BATCH = _env_int("BATCH_SIZE", 16 if CI else BATCH_SIZE)
 
 
 def train(smiles_list: list[str], ki_values: list[float]):
